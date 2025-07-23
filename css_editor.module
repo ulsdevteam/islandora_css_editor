@@ -54,14 +54,13 @@ function css_editor_form_system_theme_settings_alter(&$form, FormStateInterface 
     // Text box for custom file name
     $form['css_editor']['custom_filename'] = array(
       '#type' => 'textfield',
-      '#title' => t('Filename'),
+      '#title' => t('Custom Filename (Optional)'),
       '#default_value' => $config->get('custom_filename'),
       '#size' => 60,
       '#maxlength' => 128,
-      '#pattern' => '[A-Za-z0-9]+',
+      '#pattern' => '[A-Za-z0-9_]+',
       '#required' => FALSE,
-//      '#prefix' => '[Need to figure out how to show/hide in response to the checkbox]',
-      '#suffix' => '<div class="previous_filename">The current filename is: '.'[insert way to determine previous filename]'.'</div>',
+      '#suffix' => '<div class="previous_filename">The current filename is: ' . (($config->get('custom_filename')) ? $config->get('custom_filename') : $theme) .'.css</div>',
     );
     // Editor box.
     $form['css_editor']['css'] = array(
@@ -125,20 +124,22 @@ function _css_editor_theme_settings_form_submit($form, FormStateInterface $form_
   if ($theme) {
     // Save file.
     $path = 'public://css_editor';
-    // identify difference between new file path and old file path
-    
-    // if we're using a custom path
-//    if($form_state->getValue(['css_editor', 'custom_filename_enabled'] == 'Enabled') {
+    $oldPath = $path . DIRECTORY_SEPARATOR . \Drupal::config('css_editor.theme.' . $theme)->get('custom_filename');
+
+    if(!empty($form_state->getValue(['css_editor', 'custom_filename']))) {
       // custom path definition
-//      $file = $path . DIRECTORY_SEPARATOR . $form_state->getValue(['css_editor', 'custom_filename']);
-//    } else {
+      $file = $path . DIRECTORY_SEPARATOR . $form_state->getValue(['css_editor', 'custom_filename']) . '.css';
+    } else {
       $file = $path . DIRECTORY_SEPARATOR . $theme . '.css';
-//    }
+    }
     if (\Drupal::service('file_system')->prepareDirectory($path, FileSystemInterface::CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS)) {
       \Drupal::service('file_system')->saveData($form_state->getValue(['css_editor', 'css']), $file, FileSystemInterface::EXISTS_REPLACE);
       \Drupal::service('file_system')->chmod($file);
     }
-    // if save successful, then clear out file in previous path
+    // delete obsolete file
+    if($oldPath!=$file) {
+      \Drupal::service('file_system')->delete($oldPath);
+    }
     // Save settings.
     \Drupal::configFactory()->getEditable('css_editor.theme.' . $theme)
       ->set('enabled', $form_state->getValue(['css_editor', 'enabled']))
